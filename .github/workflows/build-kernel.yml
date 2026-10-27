@@ -1,0 +1,62 @@
+name: Build kernel (OnePlus 9R / lemonades)
+
+on:
+  workflow_dispatch:
+    inputs:
+      kernel_repo:
+        description: 'kernel repo (must match the ROM build)'
+        default: 'https://github.com/LineageOS/android_kernel_oneplus_sm8250'
+        required: true
+      kernel_branch:
+        description: 'branch'
+        default: 'lineage-23.2'
+        required: true
+      kernel_commit:
+        description: 'exact commit — 0970a5d23405 for EvolutionX 11.6.2'
+        default: '0970a5d23405622c10bc4ff60ef0ba30499611e1'
+        required: true
+      with_ksu:
+        description: 'inject KernelSU-Next v3.4.0-legacy (0/1)'
+        default: '1'
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y build-essential bc flex bison libssl-dev libelf-dev \
+            python3 zip unzip curl git liblz4-tool device-tree-compiler gcc-aarch64-linux-gnu
+
+      - name: Build
+        env:
+          KERNEL_REPO: ${{ inputs.kernel_repo }}
+          KERNEL_BRANCH: ${{ inputs.kernel_branch }}
+          KERNEL_COMMIT: ${{ inputs.kernel_commit }}
+          WITH_KSU: ${{ inputs.with_ksu }}
+        run: |
+          chmod +x scripts/build-kernel.sh
+          ./scripts/build-kernel.sh 2>&1 | tee build.log
+
+      - name: Show version
+        run: |
+          python3 - <<'PY'
+          import re
+          d = open('out-ksu/Image','rb').read()
+          m = re.search(rb'Linux version [^\x00]{0,200}', d)
+          print(m.group(0).decode() if m else 'version not found')
+          PY
+          sha256sum out-ksu/Image
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kernel-image
+          path: |
+            out-ksu/Image
+            build.log
+          if-no-files-found: error

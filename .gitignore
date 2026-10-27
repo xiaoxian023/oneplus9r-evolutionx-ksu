@@ -1,0 +1,11 @@
+﻿# build artifacts
+work/
+out-ksu/
+*.img
+!docs/**/*.img
+
+# windows / editor
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
